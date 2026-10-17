@@ -1,0 +1,677 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>كشف مصاريف خاصة</title>
+    <!-- خط Cairo وتصميم مخصص للهاتف -->
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@400;600;700&display=swap" rel="stylesheet">
+    <!-- أيقونة التطبيق المدمجة -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 512 512'><rect width='512' height='512' rx='115' fill='%232563eb'/><path d='M392 136H120c-22.09 0-40 17.91-40 40v200c0 22.09 17.91 40 40 40h272c22.09 0 40-17.91 40-40V176c0-22.09-17.91-40-40-40zm-16 160c-17.67 0-32-14.33-32-32s14.33-32 32-32 32 14.33 32 32-14.33 32-32 32z' fill='%23ffffff'/><path d='M160 216h96v32h-96zm0 64h144v32H160z' fill='%2393c5fd'/></svg>">
+    <!-- مكتبة تصدير الـ Excel -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/xlsx/0.18.5/xlsx.full.min.js"></script>
+    <style>
+        * {
+            box-sizing: border-box;
+            font-family: 'Cairo', sans-serif;
+        }
+        body {
+            background-color: #f4f6f9;
+            margin: 0;
+            padding: 12px;
+            color: #333;
+        }
+        .app-card {
+            background: #ffffff;
+            border-radius: 16px;
+            padding: 18px;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.06);
+            max-width: 600px;
+            margin: 0 auto;
+            position: relative;
+            overflow: hidden;
+        }
+        h2 {
+            text-align: center;
+            color: #1e293b;
+            font-size: 20px;
+            margin-top: 0;
+            margin-bottom: 20px;
+        }
+        .form-group {
+            margin-bottom: 12px;
+        }
+        label {
+            display: block;
+            margin-bottom: 6px;
+            font-weight: 600;
+            font-size: 14px;
+            color: #475569;
+        }
+        input, select {
+            width: 100%;
+            padding: 12px;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            font-size: 15px;
+            outline: none;
+            background: #fff;
+            transition: border-color 0.2s;
+        }
+        input:focus, select:focus {
+            border-color: #2563eb;
+        }
+        .btn {
+            width: 100%;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 15px;
+            font-weight: 700;
+            cursor: pointer;
+            transition: opacity 0.2s;
+            margin-top: 6px;
+        }
+        .btn:active {
+            opacity: 0.85;
+        }
+        .btn-imprest { background-color: #0d9488; color: white; }
+        .btn-add { background-color: #2563eb; color: white; }
+        .btn-rollover { background-color: #d97706; color: white; margin-top: 10px; }
+        .btn-excel { background-color: #16a34a; color: white; }
+        .btn-pdf { background-color: #7c3aed; color: white; }
+        .btn-reset { background-color: #64748b; color: white; margin-top: 10px; }
+
+        .table-container {
+            overflow-x: auto;
+            margin-top: 10px;
+            border: 1px solid #cbd5e1;
+            border-radius: 10px;
+            position: relative;
+            z-index: 2;
+        }
+        table {
+            width: 100%;
+            border-collapse: collapse;
+            font-size: 13px;
+            text-align: center;
+            background: transparent;
+        }
+        th, td {
+            padding: 8px 6px;
+            border: 1px solid #cbd5e1;
+        }
+        th {
+            background-color: #f1f5f9;
+            color: #334155;
+            font-weight: 700;
+        }
+        .action-btns {
+            display: flex;
+            gap: 4px;
+            justify-content: center;
+        }
+        .delete-btn {
+            background: #fee2e2;
+            color: #dc2626;
+            border: none;
+            padding: 4px 6px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 11px;
+        }
+        .edit-btn {
+            background: #e0f2fe;
+            color: #0284c7;
+            border: none;
+            padding: 4px 6px;
+            border-radius: 6px;
+            cursor: pointer;
+            font-weight: 600;
+            font-size: 11px;
+        }
+        .actions-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            margin-top: 18px;
+        }
+
+        .watermark {
+            display: none;
+            position: absolute;
+            font-family: Arial, sans-serif;
+            font-weight: 700;
+            font-size: 13px;
+            color: rgba(100, 116, 139, 0.18);
+            border: 2px dashed rgba(100, 116, 139, 0.2);
+            padding: 4px 10px;
+            border-radius: 6px;
+            pointer-events: none;
+            z-index: 1;
+            user-select: none;
+            white-space: nowrap;
+        }
+
+        .wm-top-right {
+            top: 15px;
+            right: 15px;
+            transform: rotate(-15deg);
+        }
+
+        .wm-center {
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%) rotate(-25deg);
+            font-size: 18px;
+            border-width: 2px;
+        }
+
+        .wm-bottom-left {
+            bottom: 20px;
+            left: 15px;
+            transform: rotate(-15deg);
+        }
+
+        .has-invoice {
+            color: #16a34a;
+            font-weight: bold;
+        }
+        .no-invoice {
+            color: #dc2626;
+            font-weight: bold;
+        }
+
+        @media print {
+            .no-print {
+                display: none !important;
+            }
+            body {
+                background: #ffffff;
+                padding: 0;
+            }
+            .app-card {
+                box-shadow: none;
+                padding: 0;
+                max-width: 100%;
+                overflow: visible;
+            }
+            .watermark {
+                display: block !important;
+            }
+            .table-container {
+                border: 1px solid #333;
+            }
+            th, td {
+                border: 1px solid #333 !important;
+                color: #000 !important;
+            }
+        }
+    </style>
+</head>
+<body>
+
+<div class="app-card" id="printable-area">
+
+    <!-- العلامات المائية -->
+    <div class="watermark wm-top-right">Iyhab Hanbali APPROVED</div>
+    <div class="watermark wm-center">Iyhab Hanbali APPROVED</div>
+    <div class="watermark wm-bottom-left">Iyhab Hanbali APPROVED</div>
+
+    <h2>كشف مصاريف خاصة</h2>
+
+    <!-- قسم إدخال العهدة -->
+    <div class="no-print" style="background: #f0fdf4; padding: 12px; border-radius: 12px; border: 1px solid #bbf7d0; margin-bottom: 15px;">
+        <h3 id="imprestFormTitle" style="font-size: 15px; margin-top: 0; color: #166534;">إضافة عهدة جديدة</h3>
+        <input type="hidden" id="editImprestId" value="">
+        <div class="form-group">
+            <label for="imprestDate">تاريخ العهدة:</label>
+            <input type="date" id="imprestDate">
+        </div>
+        <div class="form-group">
+            <label for="imprestAmount">مبلغ العهدة:</label>
+            <input type="number" id="imprestAmount" placeholder="0.00">
+        </div>
+        <div class="form-group">
+            <label for="imprestMethod">طريقة الاستلام:</label>
+            <select id="imprestMethod">
+                <option value="كاش / بتسليم اليد">كاش / بتسليم اليد</option>
+                <option value="حوالة بنكية">حوالة بنكية</option>
+                <option value="شيك">شيك</option>
+                <option value="رصيد مرحل من فترة سابقة">رصيد مرحل من فترة سابقة</option>
+            </select>
+        </div>
+        <button class="btn btn-imprest" id="imprestBtn" onclick="saveImprest()">+ إضافة العهدة</button>
+    </div>
+
+    <!-- ترويسة العُهد -->
+    <div id="imprestHeaderSummary" style="margin-bottom: 15px; font-size: 14px; font-weight: 600; line-height: 1.8; color: #334155; position: relative; z-index: 2;"></div>
+
+    <hr style="border: 0; border-top: 1px solid #cbd5e1; margin: 15px 0;" class="no-print">
+
+    <!-- قسم إدخال المصاريف -->
+    <div class="no-print" style="margin-bottom: 15px;">
+        <h3 id="expenseFormTitle" style="font-size: 15px; margin-top: 0; color: #1e293b;">إضافة مصروف / عملية شراء جديدة</h3>
+        <input type="hidden" id="editExpenseId" value="">
+        <div class="form-group">
+            <label for="expenseDate">تاريخ المصروف:</label>
+            <input type="date" id="expenseDate">
+        </div>
+        <div class="form-group">
+            <label for="expenseAmount">المصروفات:</label>
+            <input type="number" id="expenseAmount" placeholder="0.00">
+        </div>
+        <div class="form-group">
+            <label for="expenseNote">البيان:</label>
+            <input type="text" id="expenseNote" placeholder="تفاصيل عملية الشراء...">
+        </div>
+        <div class="form-group">
+            <label for="expensePaymentMethod">طريقة الدفع:</label>
+            <select id="expensePaymentMethod" onchange="toggleCliqField()">
+                <option value="كاش">كاش</option>
+                <option value="CliQ - كليك">CliQ - كليك</option>
+                <option value="حوالة بنكية">حوالة بنكية</option>
+                <option value="شيك">شيك</option>
+            </select>
+        </div>
+        <div class="form-group" id="cliqDetailsGroup" style="display: none; background: #e0f2fe; padding: 10px; border-radius: 8px;">
+            <label for="cliqAlias" style="color: #0369a1;">رقم الهاتف / الاسم المستعار (Alias):</label>
+            <input type="text" id="cliqAlias" placeholder="أدخل رقم الهاتف أو Alias المحول له...">
+        </div>
+        <div class="form-group">
+            <label for="hasInvoice">وجود فاتورة:</label>
+            <select id="hasInvoice">
+                <option value="نعم">نعم (يوجد فاتورة)</option>
+                <option value="لا">لا (بدون فاتورة)</option>
+            </select>
+        </div>
+        <button class="btn btn-add" id="expenseBtn" onclick="saveExpense()">+ إضافة المصروف</button>
+    </div>
+
+    <!-- جدول الحركات -->
+    <div class="table-container">
+        <table>
+            <thead>
+                <tr>
+                    <th>التاريخ</th>
+                    <th>اليوم</th>
+                    <th>المصروفات</th>
+                    <th>البيان</th>
+                    <th>طريقة الدفع / التفاصيل</th>
+                    <th>فاتورة</th>
+                    <th>الرصيد</th>
+                    <th class="no-print">إجراء</th>
+                </tr>
+            </thead>
+            <tbody id="expenseTableBody"></tbody>
+        </table>
+    </div>
+
+    <!-- ملخص المجاميع -->
+    <div style="margin-top: 20px; font-size: 14px; font-weight: 700; line-height: 2; text-align: left; padding-left: 10px; position: relative; z-index: 2;">
+        <div>مجموع العهد: <span id="totalImprestDisplay" style="color: #0d9488;">0.00</span></div>
+        <div>مجموع المشتريات: <span id="totalExpensesDisplay" style="color: #dc2626;">0.00</span></div>
+        <div><span id="balanceLabelDisplay">الباقي لصالح:</span> <span id="balanceStatusDisplay" style="color: #16a34a;">0.00</span></div>
+    </div>
+
+    <!-- أزرار التحكم والطباعة والترحيل -->
+    <div class="actions-group no-print">
+        <button class="btn btn-rollover" onclick="rolloverToNewPeriod()">🔄 ترحيل المتبقي لليوم / الورقة الجديدة</button>
+        <button class="btn btn-excel" onclick="exportToExcel()">تصدير إلى Excel</button>
+        <button class="btn btn-pdf" onclick="window.print()">طباعة / حفظ PDF موثق</button>
+        <button class="btn btn-reset" onclick="resetDay()">تصفير لبدء فترة جديدة</button>
+    </div>
+</div>
+
+<script>
+    let imprestList = [];
+    let expenses = [];
+
+    window.onload = function() {
+        setDefaultDates();
+        loadSavedData();
+    }
+
+    function setDefaultDates() {
+        const today = new Date().toISOString().split('T')[0];
+        document.getElementById('imprestDate').value = today;
+        document.getElementById('expenseDate').value = today;
+    }
+
+    function toggleCliqField() {
+        const method = document.getElementById('expensePaymentMethod').value;
+        const cliqGroup = document.getElementById('cliqDetailsGroup');
+        if (method === 'CliQ - كليك') {
+            cliqGroup.style.display = 'block';
+        } else {
+            cliqGroup.style.display = 'none';
+            document.getElementById('cliqAlias').value = '';
+        }
+    }
+
+    function formatDateToDMY(dateString) {
+        if (!dateString) return '';
+        const parts = dateString.split('-');
+        return `${parts[2]}/${parts[1]}/${parts[0]}`;
+    }
+
+    function getDayName(dateString) {
+        const dateObj = new Date(dateString + 'T00:00:00');
+        const days = ['الأحد', 'الإثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+        return days[dateObj.getDay()];
+    }
+
+    function saveImprest() {
+        const editId = document.getElementById('editImprestId').value;
+        const dateRaw = document.getElementById('imprestDate').value;
+        const amount = parseFloat(document.getElementById('imprestAmount').value);
+        const method = document.getElementById('imprestMethod').value;
+
+        if (!dateRaw || isNaN(amount) || amount <= 0) {
+            alert('الرجاء إدخال تاريخ ومبلغ عهدة صحيح');
+            return;
+        }
+
+        if (editId) {
+            imprestList = imprestList.map(item => {
+                if (item.id == editId) {
+                    return { id: Number(editId), date: formatDateToDMY(dateRaw), rawDate: dateRaw, amount, method };
+                }
+                return item;
+            });
+            document.getElementById('editImprestId').value = '';
+            document.getElementById('imprestFormTitle').innerText = 'إضافة عهدة جديدة';
+            document.getElementById('imprestBtn').innerText = '+ إضافة العهدة';
+        } else {
+            imprestList.push({
+                id: Date.now(),
+                date: formatDateToDMY(dateRaw),
+                rawDate: dateRaw,
+                amount: amount,
+                method: method
+            });
+        }
+
+        document.getElementById('imprestAmount').value = '';
+        setDefaultDates();
+        saveAndCalculate();
+    }
+
+    function editImprest(id) {
+        const item = imprestList.find(i => i.id === id);
+        if (!item) return;
+
+        document.getElementById('editImprestId').value = item.id;
+        document.getElementById('imprestDate').value = item.rawDate || '';
+        document.getElementById('imprestAmount').value = item.amount;
+        document.getElementById('imprestMethod').value = item.method;
+
+        document.getElementById('imprestFormTitle').innerText = 'تعديل العهدة المحددة';
+        document.getElementById('imprestBtn').innerText = 'حفظ التعديل';
+        window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function deleteImprest(id) {
+        imprestList = imprestList.filter(item => item.id !== id);
+        saveAndCalculate();
+    }
+
+    function saveExpense() {
+        const editId = document.getElementById('editExpenseId').value;
+        const dateRaw = document.getElementById('expenseDate').value;
+        const amount = parseFloat(document.getElementById('expenseAmount').value);
+        const note = document.getElementById('expenseNote').value;
+        const payMethod = document.getElementById('expensePaymentMethod').value;
+        const cliqAlias = document.getElementById('cliqAlias').value.trim();
+        const invoice = document.getElementById('hasInvoice').value;
+
+        if (!dateRaw || isNaN(amount) || amount <= 0 || !note.trim()) {
+            alert('الرجاء تعبئة كافة حقول المصروف بشكل صحيح');
+            return;
+        }
+
+        if (payMethod === 'CliQ - كليك' && !cliqAlias) {
+            alert('الرجاء إدخال رقم الهاتف أو الاسم المستعار الخاص بحوالة كليك');
+            return;
+        }
+
+        if (editId) {
+            expenses = expenses.map(item => {
+                if (item.id == editId) {
+                    return {
+                        id: Number(editId),
+                        date: formatDateToDMY(dateRaw),
+                        rawDate: dateRaw,
+                        day: getDayName(dateRaw),
+                        amount: amount,
+                        note: note,
+                        payMethod: payMethod,
+                        cliqAlias: cliqAlias,
+                        invoice: invoice
+                    };
+                }
+                return item;
+            });
+            document.getElementById('editExpenseId').value = '';
+            document.getElementById('expenseFormTitle').innerText = 'إضافة مصروف / عملية شراء جديدة';
+            document.getElementById('expenseBtn').innerText = '+ إضافة المصروف';
+        } else {
+            expenses.push({
+                id: Date.now(),
+                date: formatDateToDMY(dateRaw),
+                rawDate: dateRaw,
+                day: getDayName(dateRaw),
+                amount: amount,
+                note: note,
+                payMethod: payMethod,
+                cliqAlias: cliqAlias,
+                invoice: invoice
+            });
+        }
+
+        document.getElementById('expenseAmount').value = '';
+        document.getElementById('expenseNote').value = '';
+        document.getElementById('expensePaymentMethod').value = 'كاش';
+        document.getElementById('cliqAlias').value = '';
+        toggleCliqField();
+        document.getElementById('hasInvoice').value = 'نعم';
+        setDefaultDates();
+        saveAndCalculate();
+    }
+
+    function editExpense(id) {
+        const item = expenses.find(i => i.id === id);
+        if (!item) return;
+
+        document.getElementById('editExpenseId').value = item.id;
+        document.getElementById('expenseDate').value = item.rawDate || '';
+        document.getElementById('expenseAmount').value = item.amount;
+        document.getElementById('expenseNote').value = item.note;
+        document.getElementById('expensePaymentMethod').value = item.payMethod || 'كاش';
+        document.getElementById('cliqAlias').value = item.cliqAlias || '';
+        toggleCliqField();
+        document.getElementById('hasInvoice').value = item.invoice || 'نعم';
+
+        document.getElementById('expenseFormTitle').innerText = 'تعديل المصروف المحدد';
+        document.getElementById('expenseBtn').innerText = 'حفظ التعديل';
+        window.scrollTo({ top: 200, behavior: 'smooth' });
+    }
+
+    function deleteExpense(id) {
+        expenses = expenses.filter(item => item.id !== id);
+        saveAndCalculate();
+    }
+
+    function rolloverToNewPeriod() {
+        const totalImprest = imprestList.reduce((sum, item) => sum + item.amount, 0);
+        const totalExpenses = expenses.reduce((sum, item) => sum + item.amount, 0);
+        const remainingBalance = totalImprest - totalExpenses;
+
+        if (remainingBalance <= 0) {
+            alert('لا يوجد رصيد متبقي لترحيله (الرصيد المتبقي صفر أو بالسالب).');
+            return;
+        }
+
+        if (confirm(`هل تريد ترحيل المبلغ المتبقي (${remainingBalance.toFixed(2)}) لبدء ورقة/يوم جديد؟`)) {
+            const todayRaw = new Date().toISOString().split('T')[0];
+            const todayFormatted = formatDateToDMY(todayRaw);
+
+            imprestList = [{
+                id: Date.now(),
+                date: todayFormatted,
+                rawDate: todayRaw,
+                amount: remainingBalance,
+                method: 'رصيد مرحل من فترة سابقة'
+            }];
+
+            expenses = [];
+
+            saveAndCalculate();
+            alert('تم ترحيل الرصيد بنجاح لبدء ورقة جديدة!');
+        }
+    }
+
+    function saveAndCalculate() {
+        localStorage.setItem('imprest_list_v5', JSON.stringify(imprestList));
+        localStorage.setItem('imprest_expenses_v5', JSON.stringify(expenses));
+
+        renderHeaderAndTables();
+    }
+
+    function loadSavedData() {
+        const savedImprest = localStorage.getItem('imprest_list_v5');
+        const savedExpenses = localStorage.getItem('imprest_expenses_v5');
+
+        if (savedImprest !== null) imprestList = JSON.parse(savedImprest);
+        if (savedExpenses !== null) expenses = JSON.parse(savedExpenses);
+
+        renderHeaderAndTables();
+    }
+
+    function renderHeaderAndTables() {
+        const headerContainer = document.getElementById('imprestHeaderSummary');
+        headerContainer.innerHTML = '';
+
+        if (imprestList.length === 0) {
+            headerContainer.innerHTML = '<div style="color: #94a3b8; text-align: center;">لا توجد عهد مضافة بعد</div>';
+        } else {
+            imprestList.forEach((item) => {
+                headerContainer.innerHTML += `
+                    <div style="display: flex; justify-content: space-between; align-items: center; border-bottom: 1px dashed #cbd5e1; padding-bottom: 4px; margin-bottom: 4px;">
+                        <div>عهده : ${item.amount.toFixed(2)} &nbsp;&nbsp;&nbsp; بتاريخ : ${item.date} &nbsp;&nbsp;&nbsp; عن طريق : ${item.method}</div>
+                        <div class="action-btns no-print">
+                            <button class="edit-btn" onclick="editImprest(${item.id})">تعديل</button>
+                            <button class="delete-btn" onclick="deleteImprest(${item.id})">حذف</button>
+                        </div>
+                    </div>
+                `;
+            });
+        }
+
+        const totalImprest = imprestList.reduce((sum, item) => sum + item.amount, 0);
+        let currentBalance = totalImprest;
+
+        const tbody = document.getElementById('expenseTableBody');
+        tbody.innerHTML = '';
+
+        if (expenses.length === 0) {
+            tbody.innerHTML = '<tr><td colspan="8" style="color:#94a3b8; padding: 15px;">لا توجد مصروفات مسجلة</td></tr>';
+        } else {
+            expenses.forEach(item => {
+                currentBalance -= item.amount;
+                const invoiceStatus = item.invoice || 'نعم';
+                const invoiceClass = invoiceStatus === 'نعم' ? 'has-invoice' : 'no-invoice';
+                const paymentInfo = (item.payMethod === 'CliQ - كليك' && item.cliqAlias) ? `CliQ (${item.cliqAlias})` : (item.payMethod || 'كاش');
+
+                tbody.innerHTML += `
+                    <tr>
+                        <td>${item.date}</td>
+                        <td>${item.day}</td>
+                        <td>${item.amount.toFixed(2)}</td>
+                        <td>${item.note}</td>
+                        <td>${paymentInfo}</td>
+                        <td class="${invoiceClass}">${invoiceStatus}</td>
+                        <td>${currentBalance.toFixed(2)}</td>
+                        <td class="no-print">
+                            <div class="action-btns">
+                                <button class="edit-btn" onclick="editExpense(${item.id})">تعديل</button>
+                                <button class="delete-btn" onclick="deleteExpense(${item.id})">حذف</button>
+                            </div>
+                        </td>
+                    </tr>
+                `;
+            });
+        }
+
+        const totalExpenses = expenses.reduce((sum, item) => sum + item.amount, 0);
+        const finalBalance = totalImprest - totalExpenses;
+
+        document.getElementById('totalImprestDisplay').innerText = totalImprest.toFixed(2);
+        document.getElementById('totalExpensesDisplay').innerText = totalExpenses.toFixed(2);
+        
+        const labelEl = document.getElementById('balanceLabelDisplay');
+        const balanceEl = document.getElementById('balanceStatusDisplay');
+
+        if (finalBalance < 0) {
+            labelEl.innerText = "الباقي لصالح إيهاب:";
+            balanceEl.innerText = Math.abs(finalBalance).toFixed(2);
+            balanceEl.style.color = "#dc2626";
+        } else {
+            labelEl.innerText = "الباقي لصالح الشركة:";
+            balanceEl.innerText = finalBalance.toFixed(2);
+            balanceEl.style.color = "#16a34a";
+        }
+    }
+
+    function resetDay() {
+        if (confirm('هل أنت متأكد من بدء فترة جديدة؟ سيتم مسح جميع العهد والمصاريف الحالية.')) {
+            imprestList = [];
+            expenses = [];
+            localStorage.removeItem('imprest_list_v5');
+            localStorage.removeItem('imprest_expenses_v5');
+            renderHeaderAndTables();
+        }
+    }
+
+    function exportToExcel() {
+        const totalImprest = imprestList.reduce((sum, item) => sum + item.amount, 0);
+        const totalExpenses = expenses.reduce((sum, item) => sum + item.amount, 0);
+        const finalBalance = totalImprest - totalExpenses;
+
+        let data = [
+            ["كشف مصاريف خاصة"],
+            []
+        ];
+
+        imprestList.forEach(item => {
+            data.push([`عهده: ${item.amount}`, `بتاريخ: ${item.date}`, `عن طريق: ${item.method}`]);
+        });
+
+        data.push([], ["التاريخ", "اليوم", "المصروفات", "البيان", "طريقة الدفع / التفاصيل", "فاتورة", "الرصيد"]);
+
+        let runningBalance = totalImprest;
+        expenses.forEach(item => {
+            runningBalance -= item.amount;
+            const paymentInfo = (item.payMethod === 'CliQ - كليك' && item.cliqAlias) ? `CliQ (${item.cliqAlias})` : (item.payMethod || 'كاش');
+            data.push([item.date, item.day, item.amount, item.note, paymentInfo, item.invoice || 'نعم', runningBalance]);
+        });
+
+        data.push([], ["مجموع العهد", totalImprest]);
+        data.push(["مجموع المشتريات", totalExpenses]);
+        
+        if (finalBalance < 0) {
+            data.push(["الباقي لصالح إيهاب", Math.abs(finalBalance)]);
+        } else {
+            data.push(["الباقي لصالح الشركة", finalBalance]);
+        }
+
+        const ws = XLSX.utils.aoa_to_sheet(data);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "كشف المصاريف");
+        XLSX.writeFile(wb, "Special_Expenses_Report.xlsx");
+    }
+</script>
+
+</body>
+</html>
